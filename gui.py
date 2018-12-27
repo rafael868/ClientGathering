@@ -1,9 +1,8 @@
 import wx
 import sys
 
-customers = [('Customer 1', 'cust1@gmail.com', '12.09.2018', '12.09.2023', '1 year, 3 m, 12 days'),
-             ('Customer 2', 'cust2@gmail.com', '12.09.2018', '12.09.2023', '3 year, 4 m, 11 days'),
-             ('Customer 3', 'cust3@gmail.com', '09.09.2017', '12.09.2022', '2 year, 2 m, 2 days')]
+from data_handler import Client, DataBase
+
 
 class GUI(wx.Frame):
     def __init__(self, parent, title, size):
@@ -18,6 +17,7 @@ class GUI(wx.Frame):
         self.cListCtrl = wx.ListCtrl(self.panel, -1, style=wx.LC_REPORT | wx.LC_HRULES | wx.LC_VRULES)
 
         self.cListCtrl.Bind(wx.EVT_LIST_ITEM_SELECTED, self.onSelectItem)
+        self.Bind(wx.EVT_CLOSE, self.onClose)
 
         self.deleteBtn = wx.Button(self.panel, -1, 'Delete')
         self.newBtn = wx.Button(self.panel, -1, 'New')
@@ -25,8 +25,22 @@ class GUI(wx.Frame):
         self.width = self.panel.GetParent().GetClientSize().width / 5
 
         self.selected_item = -1
+        self.selected_name = None
 
         self.InitUI()
+
+        self.c = Client()
+
+        self.db = DataBase('clients.db', 'cl_tab')
+
+        try:
+            self.db.InitDb()
+        except:
+            pass
+
+        self.data = self.db.get_clients()
+        self.updateGuiData(self.data)
+
         self.Centre()
         self.Show()
 
@@ -40,13 +54,6 @@ class GUI(wx.Frame):
         self.newBtn.Bind(wx.EVT_BUTTON, self.onClickNew)
         self.deleteBtn.Bind(wx.EVT_BUTTON, self.onClickDel)
 
-        for i in customers:
-            index = self.cListCtrl.InsertItem(sys.maxsize, i[0])
-            self.cListCtrl.SetItem(index, 1, i[1])
-            self.cListCtrl.SetItem(index, 2, i[2])
-            self.cListCtrl.SetItem(index, 3, i[3])
-            self.cListCtrl.SetItem(index, 4, i[4])
-
         self.btnBox.Add(self.deleteBtn, 0)
         self.btnBox.Add(self.newBtn, 0)
         self.listBox.Add(self.cListCtrl, 0, wx.EXPAND | wx.ALL)
@@ -56,6 +63,14 @@ class GUI(wx.Frame):
         self.panel.SetSizer(self.box)
 
         self.panel.Bind(wx.EVT_SIZE, self.onResize)
+
+    def updateGuiData(self, data):
+        for item in data:
+            index = self.cListCtrl.InsertItem(sys.maxsize, item[0])
+            self.cListCtrl.SetItem(index, 1, item[1])
+            self.cListCtrl.SetItem(index, 2, item[2])
+            self.cListCtrl.SetItem(index, 3, item[3])
+            self.cListCtrl.SetItem(index, 4, '0')
 
     def onResize(self, event):
         event.Skip()
@@ -69,6 +84,7 @@ class GUI(wx.Frame):
 
     def onSelectItem(self, event):
         self.selected_item = event.GetIndex()
+        self.selected_name = self.cListCtrl.GetItem(self.selected_item, 0)
 
     def onClickDel(self, event):
 
@@ -79,9 +95,11 @@ class GUI(wx.Frame):
 
         if dial.ShowModal() == wx.ID_OK:
             try:
+                self.db.del_clinet(self.selected_name.GetText())
                 self.cListCtrl.DeleteItem(self.selected_item)
             except:
-                print('Item not found')
+                print('ERROR: Can\'t delete this item')
+        self.selected_item = -1
 
     def onClickNew(self, event):
         dlg = wx.Dialog(self)
@@ -125,10 +143,16 @@ class GUI(wx.Frame):
         dlg.SetSizer(box)
 
         if dlg.ShowModal() == wx.ID_OK:
-            print("name: {}".format(name.GetValue()))
-            print("email: {}".format(email.GetValue()))
-            print("Date of test: {}".format(date_of_test.GetValue()))
-            print("Date of next test: {}".format(date_next.GetValue()))
+            self.c.set_data(name.GetValue(), email.GetValue(), date_of_test.GetValue(), date_next.GetValue())
+            self.db.add_client(self.c)
+            index = self.cListCtrl.InsertItem(sys.maxsize, name.GetValue())
+            self.cListCtrl.SetItem(index, 1, email.GetValue())
+            self.cListCtrl.SetItem(index, 2, date_of_test.GetValue())
+            self.cListCtrl.SetItem(index, 3, date_next.GetValue())
+            self.cListCtrl.SetItem(index, 4, '0')
         dlg.Destroy()
 
+    def onClose(self, event):
+        self.db.close_conn()
+        self.Destroy()
 
